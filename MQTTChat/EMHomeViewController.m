@@ -74,6 +74,7 @@
     self.rootTopic = @"t1";
     self.appId = @"95kih0";
     self.host = @"95kih0.cn1.mqtt.chat";
+  
     self.port = 1883;
     self.qos = 0;
     self.tls = 0;
@@ -105,24 +106,32 @@
             NSLog(@"=======token:%@==========",token);
             
             // 从console管理平台获取连接地址
-           [self.manager connectTo:self.host
-                              port:self.port
-                               tls:self.tls
-                         keepalive:60
-                             clean:true
-                              auth:true
-                              user:userName
-                              pass:token
-                              will:false
-                         willTopic:nil
-                           willMsg:nil
-                           willQos:0
-                    willRetainFlag:FALSE
-                      withClientId:self.clientId];
+            [self.manager connectTo:self.host
+                               port:self.port
+                                tls:self.tls
+                          keepalive:60
+                              clean:true
+                               auth:true
+                               user:userName
+                               pass:token
+                               will:false
+                          willTopic:nil
+                            willMsg:nil
+                            willQos:MQTTQosLevelAtMostOnce
+                     willRetainFlag:false
+                       withClientId:self.clientId
+                     securityPolicy:nil
+                       certificates:nil
+                      protocolLevel:MQTTProtocolVersion50
+                     connectHandler:^(NSError *error) {
+                            
+            }];
             
         }];
     } else {
-        [self.manager connectToLast];
+        [self.manager connectToLast:^(NSError *error) {
+                    
+        }];
     }
     
     /*
@@ -246,20 +255,22 @@
                                     };
     __block NSString *token  = @"";
     
-    [manager POST:urlString parameters:parameters progress:nil success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
-        
-        NSError *error = nil;
-        NSData *jsonData = [NSJSONSerialization dataWithJSONObject:responseObject options:NSJSONWritingPrettyPrinted error:&error];
-        NSDictionary *jsonDic = [NSJSONSerialization JSONObjectWithData:jsonData options:NSJSONReadingMutableContainers error:&error];
-        NSLog(@"%s jsonDic:%@",__func__,jsonDic);
-        token = jsonDic[@"access_token"];
-        
-        response(token);
-    } failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error) {
+    [manager POST:urlString
+       parameters:parameters
+          headers:@{}
+         progress:nil
+          success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
+            NSError *error = nil;
+            NSData *jsonData = [NSJSONSerialization dataWithJSONObject:responseObject options:NSJSONWritingPrettyPrinted error:&error];
+            NSDictionary *jsonDic = [NSJSONSerialization JSONObjectWithData:jsonData options:NSJSONReadingMutableContainers error:&error];
+            NSLog(@"%s jsonDic:%@",__func__,jsonDic);
+            token = jsonDic[@"access_token"];
+            response(token);
+        }
+          failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error) {
             NSLog(@"%s error:%@",__func__,error.debugDescription);
             response(token);
-    }];
-    
+        }];
 }
 
 
@@ -291,14 +302,19 @@
  * 重新连接
  */
 - (void)connect {
-    [self.manager connectToLast];
+    [self.manager connectToLast:^(NSError *error) {
+            
+    }];
 }
 
 /*
  * 断开连接
  */
 - (void)disConnect {
-    [self.manager disconnect];
+    [self.manager disconnectWithDisconnectHandler:^(NSError *error) {
+            
+    }];
+    
     self.manager.subscriptions = @{};
 }
 
@@ -341,6 +357,7 @@
 //    }
 //
 //    self.manager.subscriptions = currentSubscriptions;
+    
 }
 
 
@@ -350,7 +367,7 @@
         case MQTTSessionManagerStateClosed:
             self.statusContentLabel.text = @"closed";
             self.disconnectButton.enabled = false;
-            self.connectButton.enabled = false;
+            self.connectButton.enabled = true;
             break;
         case MQTTSessionManagerStateClosing:
             self.statusContentLabel.text = @"closing";
@@ -358,8 +375,7 @@
             self.connectButton.enabled = false;
             break;
         case MQTTSessionManagerStateConnected:
-            self.statusContentLabel.text = [NSString stringWithFormat:@"connected as %@",
-                                self.clientId];
+            self.statusContentLabel.text = [NSString stringWithFormat:@"connected as %@",self.clientId];
             self.disconnectButton.enabled = true;
             self.connectButton.enabled = false;
             break;
@@ -374,11 +390,14 @@
             self.connectButton.enabled = false;
             break;
         case MQTTSessionManagerStateStarting:
+            break;
         default:
             self.statusContentLabel.text = @"not connected";
             self.disconnectButton.enabled = false;
             self.connectButton.enabled = true;
-            [self.manager connectToLast];
+            [self.manager connectToLast:^(NSError *error) {
+                            
+            }];
             break;
     }
 }
@@ -561,14 +580,6 @@
     return _receiveMsgs;
 }
 
-
-//- (MQTTSessionManager *)manager {
-//    if (_manager == nil) {
-//        _manager= [[MQTTSessionManager alloc] init];
-//        _manager.delegate = self;
-//    }
-//    return _manager;
-//}
 
 @end
 
