@@ -19,7 +19,7 @@
 #define Button_Height  30.0f
 #define Button_Bg_Color  [UIColor brownColor]
 
-
+//环信MQTT REST API地址 通过console后台[MQTT]->[服务概览]->[服务配置]下[REST API地址]获取
 #define getToken_url   @"https://a1.easemob.com/1129191118019072/test1/token"
 
 
@@ -29,11 +29,17 @@
  */
 @property (nonatomic,strong) MQTTSessionManager *manager;
 @property (nonatomic,strong) NSString *rootTopic;
-@property (nonatomic,strong) NSString *appId;
+//环信MQTT服务器地址 通过console后台[MQTT]->[服务概览]->[服务配置]下[连接地址]获取
 @property (nonatomic,strong) NSString *host;
+//协议服务端口 通过console后台[MQTT]->[服务概览]->[服务配置]下[连接端口]获取
 @property (nonatomic,assign) NSInteger port;
+// appID 通过console后台[MQTT]->[服务概览]->[服务配置]下[AppID]获取
+@property (nonatomic,strong) NSString *appId;
 @property (nonatomic,assign) NSInteger tls;
+//开发者ID 通过console后台[应用概览]->[应用详情]->[开发者ID]下[ Client ID]获取
 @property (nonatomic,strong) NSString *clientId;
+// 自定义deviceID
+@property (nonatomic,strong) NSString *deviceId;
 @property (nonatomic,assign) NSInteger qos;
 
 @property (nonatomic,strong)  NSMutableArray *receiveMsgs;
@@ -45,13 +51,10 @@
 @property (nonatomic,strong)  UIButton *clearButton;
 @property (nonatomic,strong)  UIButton *disconnectButton;
 @property (nonatomic,strong)  UIButton *connectButton;
-
-
 //发送内容按钮
 @property (nonatomic,strong) UIButton *sendMsgButton;
 //主题订阅按钮
 @property (nonatomic,strong) UIButton *subscribeTopicButton;
-
 //取消主题订阅按钮
 @property (nonatomic,strong) UIButton *unSubscribeTopicButton;
 
@@ -72,16 +75,23 @@
 - (void)loadConfiguation {
     
     self.rootTopic = @"t1";
+    
+    // appID 通过console后台[MQTT]->[服务概览]->[服务配置]下[AppID]获取
     self.appId = @"95kih0";
+    
+    //环信MQTT服务器地址 通过console后台[MQTT]->[服务概览]->[服务配置]下[连接地址]获取
     self.host = @"95kih0.cn1.mqtt.chat";
-  
+    
+    // 协议服务端口 通过console后台[MQTT]->[服务概览]->[服务配置]下[连接端口]获取
     self.port = 1883;
     self.qos = 0;
     self.tls = 0;
     
+    // 自定义deviceID
+    self.deviceId = [UIDevice currentDevice].identifierForVendor.UUIDString;
     
-    NSString *deviceID = [UIDevice currentDevice].identifierForVendor.UUIDString;
-    self.clientId = [NSString stringWithFormat:@"%@@%@",deviceID,self.appId];
+    //开发者ID 通过console后台[应用概览]->[应用详情]->[开发者ID]下[ Client ID]获取
+    self.clientId = [NSString stringWithFormat:@"%@@%@",self.deviceId,self.appId];
     
     
     /*
@@ -97,7 +107,7 @@
         
         
         //【userName && passWord】需要从后台创建获取
-        NSString *userName = @"demo";
+        NSString *userName = @"demo";//自定义用户名 长度不超过64位即可
         NSString *passWord = @"123456";
         
         
@@ -109,7 +119,7 @@
             [self.manager connectTo:self.host
                                port:self.port
                                 tls:self.tls
-                          keepalive:60
+                          keepalive:45
                               clean:true
                                auth:true
                                user:userName
@@ -239,7 +249,7 @@
 
 - (void)getTokenWithUsername:(NSString *)username password:(NSString *)password completion:(void (^)(NSString *token))response {
     
-
+       //环信MQTT REST API地址 通过console后台[MQTT]->[服务概览]->[服务配置]下[REST API地址]获取
        NSString *urlString = getToken_url;
        //初始化一个AFHTTPSessionManager
        AFHTTPSessionManager *manager = [AFHTTPSessionManager manager];
