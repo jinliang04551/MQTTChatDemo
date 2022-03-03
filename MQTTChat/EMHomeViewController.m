@@ -38,8 +38,18 @@
 @property (nonatomic,assign) NSInteger tls;
 //开发者ID 通过console后台[应用概览]->[应用详情]->[开发者ID]下[ Client ID]获取
 @property (nonatomic,strong) NSString *clientId;
-// 自定义deviceID
+//自定义deviceID
 @property (nonatomic,strong) NSString *deviceId;
+
+//环信MQTT REST API地址 通过console后台[MQTT]->[服务概览]->[服务配置]下[REST API地址]获取
+@property (nonatomic,strong) NSString *appClientId;
+
+//开发者ID 通过console后台[应用概览]->[应用详情]->[开发者ID]下[ Client ID]获取
+@property (nonatomic,strong) NSString *restapi;
+
+//开发者密钥 通过console后台[应用概览]->[应用详情]->[开发者ID]下[ ClientSecret]获取
+@property (nonatomic,strong) NSString *appClientSecret;
+
 @property (nonatomic,assign) NSInteger qos;
 
 @property (nonatomic,strong)  NSMutableArray *receiveMsgs;
@@ -77,10 +87,19 @@
     self.rootTopic = @"t1";
     
     // appID 通过console后台[MQTT]->[服务概览]->[服务配置]下[AppID]获取
-    self.appId = @"95kih0";
+    self.appId = @"ff6sc0";
     
     //环信MQTT服务器地址 通过console后台[MQTT]->[服务概览]->[服务配置]下[连接地址]获取
-    self.host = @"95kih0.cn1.mqtt.chat";
+    self.host = @"ff6sc0.cn1.mqtt.chat";
+    
+    //环信MQTT REST API地址 通过console后台[MQTT]->[服务概览]->[服务配置]下[REST API地址]获取
+    self.restapi = @"https://api.cn1.mqtt.chat/app/ff6sc0";
+    
+    //开发者ID 通过console后台[应用概览]->[应用详情]->[开发者ID]下[ Client ID]获取
+    self.appClientId = @"YXA67-uKaalmThCOut6Q8uPLSg";
+    
+    // 开发者密钥 通过console后台[应用概览]->[应用详情]->[开发者ID]下[ ClientSecret]获取
+    self.appClientSecret = @"YXA63CFpMQFai4MdTDdGN92BBoG6_6g";
     
     // 协议服务端口 通过console后台[MQTT]->[服务概览]->[服务配置]下[连接端口]获取
     self.port = 1883;
@@ -107,36 +126,37 @@
         
         
         //【userName && passWord】需要从后台创建获取
-        NSString *userName = @"demo";//自定义用户名 长度不超过64位即可
-        NSString *passWord = @"123456";
+        //自定义用户名 长度不超过64位即可
+        NSString *userName = @"demo";
         
-        
-        //生成token（请求服务器api）
-        [self getTokenWithUsername:userName password:passWord completion:^(NSString *token) {
-            NSLog(@"=======token:%@==========",token);
-            
-            // 从console管理平台获取连接地址
-            [self.manager connectTo:self.host
-                               port:self.port
-                                tls:self.tls
-                          keepalive:45
-                              clean:true
-                               auth:true
-                               user:userName
-                               pass:token
-                               will:false
-                          willTopic:nil
-                            willMsg:nil
-                            willQos:MQTTQosLevelAtMostOnce
-                     willRetainFlag:false
-                       withClientId:self.clientId
-                     securityPolicy:nil
-                       certificates:nil
-                      protocolLevel:MQTTProtocolVersion50
-                     connectHandler:^(NSError *error) {
-                            
-            }];
-            
+        [self getAppTokenWithAppClientId:self.appClientId appClientSecret:self.appClientSecret completion:^(NSString *appToken, NSInteger expires) {
+            if (appToken.length > 0) {
+                [self getUserTokenWithUsername:userName appToken:appToken clientId:self.clientId  expires:expires completion:^(NSString *userToken) {
+                    NSLog(@"=======userToken:%@==========",userToken);
+                    if (userToken.length > 0) {
+                        // 从console管理平台获取连接地址
+                        [self.manager connectTo:self.host
+                                           port:self.port
+                                            tls:self.tls
+                                      keepalive:45
+                                          clean:true
+                                           auth:true
+                                           user:userName
+                                           pass:userToken
+                                           will:false
+                                      willTopic:nil
+                                        willMsg:nil
+                                        willQos:MQTTQosLevelAtMostOnce
+                                 willRetainFlag:false
+                                   withClientId:self.clientId
+                                 securityPolicy:nil
+                                   certificates:nil
+                                  protocolLevel:MQTTProtocolVersion50
+                                 connectHandler:^(NSError *error) {
+                        }];
+                    }
+                }];
+            }
         }];
     } else {
         [self.manager connectToLast:^(NSError *error) {
@@ -246,11 +266,14 @@
 
 
 #pragma mark private method
-
-- (void)getTokenWithUsername:(NSString *)username password:(NSString *)password completion:(void (^)(NSString *token))response {
+//获取应用token
+- (void)getAppTokenWithAppClientId:(NSString *)appClientId
+                   appClientSecret:(NSString *)appClientSecret
+                        completion:(void (^)(NSString *appToken,NSInteger expires))response {
     
        //环信MQTT REST API地址 通过console后台[MQTT]->[服务概览]->[服务配置]下[REST API地址]获取
-       NSString *urlString = getToken_url;
+       NSString *urlString = [NSString stringWithFormat:@"%@/openapi/rm/app/token",self.restapi];
+    
        //初始化一个AFHTTPSessionManager
        AFHTTPSessionManager *manager = [AFHTTPSessionManager manager];
        //设置请求体数据为json类型
@@ -259,12 +282,12 @@
        manager.responseSerializer = [AFJSONResponseSerializer serializer];
        //请求体，参数（NSDictionary 类型）
    
-       NSDictionary *parameters = @{@"grant_type":@"password",
-                                    @"username":username,
-                                    @"password":password
+       NSDictionary *parameters = @{@"appClientId":appClientId,
+                                    @"appClientSecret":appClientSecret
                                     };
+    NSLog(@"%s\n urlString:%@\n parameters:%@\n",__func__,urlString,parameters);
+
     __block NSString *token  = @"";
-    
     [manager POST:urlString
        parameters:parameters
           headers:@{}
@@ -274,7 +297,58 @@
             NSData *jsonData = [NSJSONSerialization dataWithJSONObject:responseObject options:NSJSONWritingPrettyPrinted error:&error];
             NSDictionary *jsonDic = [NSJSONSerialization JSONObjectWithData:jsonData options:NSJSONReadingMutableContainers error:&error];
             NSLog(@"%s jsonDic:%@",__func__,jsonDic);
-            token = jsonDic[@"access_token"];
+            NSDictionary *body = jsonDic[@"body"];
+            token = body[@"access_token"];
+            NSInteger expire_in = [body[@"expires_in"] integerValue];
+            response(token,expire_in);
+        }
+          failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error) {
+            NSLog(@"%s error:%@",__func__,error.debugDescription);
+            response(token,0);
+        }];
+}
+
+
+//获取用户token
+- (void)getUserTokenWithUsername:(NSString *)username
+                        appToken:(NSString *)appToken
+                        clientId:(NSString *)clientId
+                         expires:(NSInteger)expires
+                      completion:(void (^)(NSString *userToken))response {
+    
+       //环信MQTT REST API地址 通过console后台[MQTT]->[服务概览]->[服务配置]下[REST API地址]获取
+       NSString *urlString = [NSString stringWithFormat:@"%@/openapi/rm/user/token",self.restapi];
+    
+       //初始化一个AFHTTPSessionManager
+       AFHTTPSessionManager *manager = [AFHTTPSessionManager manager];
+       //设置请求体数据为json类型
+       manager.requestSerializer = [AFJSONRequestSerializer serializer];
+       //设置响应体数据为json类型
+       manager.responseSerializer = [AFJSONResponseSerializer serializer];
+       //请求体，参数（NSDictionary 类型）
+   
+    
+    NSDictionary *parameters = @{
+                                 @"username":username,
+                                 @"expires_in":@(expires),//过期时间，单位为秒，默认为3天，如需调整，可提工单调整
+                                 @"cid":clientId
+                                    };
+    NSLog(@"%s\n urlString:%@\n parameters:%@\n",__func__,urlString,parameters);
+
+    __block NSString *token  = @"";
+    
+    [manager POST:urlString
+       parameters:parameters
+          headers:@{@"Authorization":appToken}
+         progress:nil
+          success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
+            NSError *error = nil;
+            NSData *jsonData = [NSJSONSerialization dataWithJSONObject:responseObject options:NSJSONWritingPrettyPrinted error:&error];
+            NSDictionary *jsonDic = [NSJSONSerialization JSONObjectWithData:jsonData options:NSJSONReadingMutableContainers error:&error];
+            NSLog(@"%s jsonDic:%@",__func__,jsonDic);
+            NSDictionary *body = jsonDic[@"body"];
+            token = body[@"access_token"];
+
             response(token);
         }
           failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error) {
